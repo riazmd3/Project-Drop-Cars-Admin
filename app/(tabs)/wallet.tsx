@@ -112,7 +112,7 @@ export default function WalletScreen() {
   };
 
   const formatCurrency = (amount: number) => {
-    return `₹${(amount / 100).toLocaleString('en-IN')}`;
+    return `₹${(amount).toLocaleString('en-IN')}`;
   };
 
   return (
@@ -171,11 +171,23 @@ export default function WalletScreen() {
                 <View style={styles.ownerDetails}>
                   <View style={styles.detailItem}>
                     <Phone size={16} color="#6B7280" />
-                    <Text style={styles.detailText}>{foundOwner.primary_number}</Text>
+                    <Text style={styles.detailText}>Primary Number : {foundOwner.primary_number}</Text>
                   </View>
                   <View style={styles.detailItem}>
                     <User size={16} color="#6B7280" />
                     <Text style={styles.detailText}>Aadhar: {foundOwner.aadhar_number}</Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <User size={16} color="#6B7280" />
+                    <Text style={styles.detailText}>Address : {foundOwner.address}</Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <User size={16} color="#6B7280" />
+                    <Text style={styles.detailText}>City: {foundOwner.city}</Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <User size={16} color="#6B7280" />
+                    <Text style={styles.detailText}>Pincode : {foundOwner.pincode}</Text>
                   </View>
                 </View>
               </View>

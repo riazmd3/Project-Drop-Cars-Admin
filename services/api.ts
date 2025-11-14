@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://192.168.1.13:8000/api';
+const BASE_URL = 'http://172.20.10.7:8000/api';
 
 class ApiService {
   private async getAuthToken(): Promise<string | null> {
@@ -42,7 +42,8 @@ class ApiService {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('API request failed:', error);
+      console.error('API request failed Force Logout:', error);
+      this.logout()
       throw error;
     }
   }

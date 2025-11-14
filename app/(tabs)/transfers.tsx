@@ -75,15 +75,11 @@ export default function TransfersScreen() {
       },
       'plain-text',
       '',
-      true
     );
   };
 
   const formatCurrency = (amount: number) => {
-    return `₹${(amount / 100).toLocaleString('en-IN', { 
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2 
-    })}`;
+    return `₹${(amount).toLocaleString('en-IN')}`;
   };
 
   const formatDate = (dateString: string) => {
