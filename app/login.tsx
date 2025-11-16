@@ -31,8 +31,10 @@ export default function LoginScreen() {
     try {
       await apiService.login({ username: username.trim(), password });
       router.replace('/(tabs)');
-    } catch (error) {
-      Alert.alert('Login Failed', 'Invalid credentials. Please try again.');
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Invalid credentials. Please try again.';
+      Alert.alert('Login Failed', errorMessage);
+      console.error('Login error:', error);
     } finally {
       setLoading(false);
     }

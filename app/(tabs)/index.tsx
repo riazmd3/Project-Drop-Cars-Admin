@@ -32,8 +32,8 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       const [vendorsData, vehicleOwnersData, transfersData] = await Promise.all([
-        apiService.getVendors(0, 1),
-        apiService.getVehicleOwners(0, 1),
+        apiService.getAllAccounts(0, 1, 'vendor'),
+        apiService.getAllAccounts(0, 1, 'vehicle_owner'),
         apiService.getPendingTransfers(0, 100),
       ]);
 

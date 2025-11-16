@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://172.20.10.7:8000/api';
+const BASE_URL = 'http://10.59.192.145:8000/api';
+// const BASE_URL = 'https://drop-cars-api-1049299844333.asia-south2.run.app/api';
 
 class ApiService {
   private async getAuthToken(): Promise<string | null> {
@@ -20,7 +21,7 @@ class ApiService {
     return headers;
   }
 
-  private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async makeRequest<T>(endpoint: string, options: RequestInit = {}, skipLogoutOnError = false): Promise<T> {
     const url = `${BASE_URL}${endpoint}`;
     const headers = await this.getAuthHeaders();
     
@@ -36,24 +37,34 @@ class ApiService {
       const response = await fetch(url, config);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.message || errorJson.detail || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
       
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('API request failed Force Logout:', error);
-      this.logout()
+      console.error('API request failed:', error);
+      if (!skipLogoutOnError) {
+        this.logout();
+      }
       throw error;
     }
   }
 
   // Auth
-  async login(credentials: { username: string; password: string }): Promise<{ access_token: string }> {
-    const response = await this.makeRequest<{ access_token: string }>('/admin/signin', {
+  async login(credentials: { username: string; password: string }): Promise<{ access_token: string; token_type: string; admin: any }> {
+    const response = await this.makeRequest<{ access_token: string; token_type: string; admin: any }>('/admin/signin', {
       method: 'POST',
       body: JSON.stringify(credentials),
-    });
+    }, true); // Skip logout on login errors
     
     if (response.access_token) {
       await AsyncStorage.setItem('auth_token', response.access_token);
@@ -64,6 +75,37 @@ class ApiService {
 
   async logout(): Promise<void> {
     await AsyncStorage.removeItem('auth_token');
+  }
+
+  // Unified Accounts
+  async getAllAccounts(
+    skip = 0, 
+    limit = 100, 
+    accountType?: 'vendor' | 'vehicle_owner' | 'driver' | 'quickdriver',
+    statusFilter?: 'active' | 'inactive' | 'pending' | string
+  ): Promise<{
+    accounts: Array<{
+      id: string;
+      name: string;
+      account_type: string;
+      account_status: string;
+    }>;
+    total_count: number;
+    active_count: number;
+    inactive_count: number;
+  }> {
+    let queryParams = `skip=${skip}&limit=${limit}`;
+    if (accountType) {
+      queryParams += `&account_type=${accountType}`;
+    }
+    if (statusFilter) {
+      queryParams += `&status_filter=${statusFilter}`;
+    }
+    return this.makeRequest(`/admin/accounts?${queryParams}`);
+  }
+
+  async getAccountDetails(accountId: string, accountType: 'vendor' | 'vehicle_owner' | 'driver' | 'quickdriver'): Promise<any> {
+    return this.makeRequest(`/admin/accounts/${accountId}?account_type=${accountType}`);
   }
 
   // Vendors
