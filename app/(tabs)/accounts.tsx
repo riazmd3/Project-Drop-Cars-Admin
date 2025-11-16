@@ -7,25 +7,23 @@ import {
   TouchableOpacity,
   RefreshControl,
   TextInput,
+  Switch,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, User, Building2, Car, UserCircle, Filter, FileText } from 'lucide-react-native';
+import { Search, Building2, Car, UserCircle, FileText } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { apiService } from '@/services/api';
-import StatusBadge from '@/components/StatusBadge';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ErrorMessage from '@/components/ErrorMessage';
-import ActionSheet from '@/components/ActionSheet';
 
 interface Account {
   id: string;
   name: string;
-  account_type: 'vendor' | 'vehicle_owner' | 'driver' | 'quickdriver';
+  account_type: 'vendor' | 'vehicle_owner' | 'driver' | 'quickdriver' | 'car';
   account_status: string;
+  driver_status?: string; // For drivers and quickdrivers
 }
-
-type AccountTypeFilter = 'all' | 'vendor' | 'vehicle_owner' | 'driver' | 'quickdriver';
-type StatusFilter = 'all' | 'active' | 'inactive' | 'pending';
 
 export default function AccountsScreen() {
   const router = useRouter();
@@ -34,13 +32,9 @@ export default function AccountsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-  const [showStatusSheet, setShowStatusSheet] = useState(false);
-  const [accountTypeFilter, setAccountTypeFilter] = useState<AccountTypeFilter>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [totalCount, setTotalCount] = useState(0);
-  const [activeCount, setActiveCount] = useState(0);
-  const [inactiveCount, setInactiveCount] = useState(0);
+  const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
+  const [accountTypeFilter, setAccountTypeFilter] = useState<'all' | 'vendor' | 'vehicle_owner' | 'driver' | 'quickdriver'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
 
   const fetchAccounts = async () => {
     try {
@@ -50,10 +44,12 @@ export default function AccountsScreen() {
       
       const data = await apiService.getAllAccounts(0, 100, accountTypeParam, statusParam);
       
-      // Sort accounts: inactive/pending first, then active
+      // Sort accounts: inactive/pending/blocked first, then active/online
       const sortedAccounts = [...data.accounts].sort((a, b) => {
-        const aInactive = a.account_status === 'INACTIVE' || a.account_status === 'PENDING' || a.account_status === 'OFFLINE' || a.account_status === 'PROCESSING';
-        const bInactive = b.account_status === 'INACTIVE' || b.account_status === 'PENDING' || b.account_status === 'OFFLINE' || b.account_status === 'PROCESSING';
+        const aStatus = getStatusForAccount(a);
+        const bStatus = getStatusForAccount(b);
+        const aInactive = isInactiveStatus(aStatus, a.account_type);
+        const bInactive = isInactiveStatus(bStatus, b.account_type);
         
         if (aInactive && !bInactive) return -1;
         if (!aInactive && bInactive) return 1;
@@ -61,15 +57,96 @@ export default function AccountsScreen() {
       });
       
       setAccounts(sortedAccounts);
-      setTotalCount(data.total_count);
-      setActiveCount(data.active_count);
-      setInactiveCount(data.inactive_count);
     } catch (error) {
       console.error('Failed to fetch accounts:', error);
       setError('Failed to load accounts. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const getStatusForAccount = (account: Account): string => {
+    // For drivers and quickdrivers, use driver_status
+    if (account.account_type === 'driver' || account.account_type === 'quickdriver') {
+      return account.driver_status || account.account_status || 'BLOCKED';
+    }
+    // For vendors and vehicle_owners, use account_status
+    return account.account_status || 'Inactive';
+  };
+
+  const isInactiveStatus = (status: string, accountType: string): boolean => {
+    if (accountType === 'vendor' || accountType === 'vehicle_owner') {
+      return status === 'INACTIVE' || status === 'Inactive' || status === 'PENDING';
+    } else if (accountType === 'driver' || accountType === 'quickdriver') {
+      return status === 'BLOCKED' || status === 'OFFLINE' || status === 'PROCESSING';
+    }
+    return false;
+  };
+
+  const isActiveStatus = (status: string, accountType: string): boolean => {
+    if (accountType === 'vendor' || accountType === 'vehicle_owner') {
+      return status === 'ACTIVE' || status === 'Active';
+    } else if (accountType === 'driver' || accountType === 'quickdriver') {
+      return status === 'ONLINE' || status === 'DRIVING';
+    }
+    return false;
+  };
+
+  const getToggleStatus = (account: Account): boolean => {
+    const status = getStatusForAccount(account);
+    return isActiveStatus(status, account.account_type);
+  };
+
+  const getTargetStatus = (account: Account, toggleValue: boolean): string => {
+    if (account.account_type === 'vendor' || account.account_type === 'vehicle_owner') {
+      return toggleValue ? 'Active' : 'Inactive';
+    } else if (account.account_type === 'driver' || account.account_type === 'quickdriver') {
+      return toggleValue ? 'ONLINE' : 'BLOCKED';
+    }
+    return toggleValue ? 'Active' : 'Inactive';
+  };
+
+  const handleToggleStatus = async (account: Account, newValue: boolean) => {
+    const newStatus = getTargetStatus(account, newValue);
+    
+    // Ensure account ID is a string
+    const accountId = String(account.id);
+    
+    // Optimistically update UI
+    setAccounts(accounts.map(acc => {
+      if (acc.id === account.id) {
+        if (account.account_type === 'driver' || account.account_type === 'quickdriver') {
+          return { ...acc, driver_status: newStatus };
+        } else {
+          return { ...acc, account_status: newStatus };
+        }
+      }
+      return acc;
+    }));
+
+    setUpdatingStatus(prev => new Set(prev).add(account.id));
+
+    try {
+      await apiService.updateAccountStatus(accountId, account.account_type, newStatus);
+      // Refresh to get accurate data
+      await fetchAccounts();
+    } catch (error: any) {
+      // Revert on error
+      setAccounts(accounts.map(acc => {
+        if (acc.id === account.id) {
+          return account; // Restore original account object
+        }
+        return acc;
+      }));
+      
+      Alert.alert('Error', error?.message || 'Failed to update account status');
+    } finally {
+      setUpdatingStatus(prev => {
+        const next = new Set(prev);
+        next.delete(account.id);
+        return next;
+      });
     }
   };
 
@@ -82,25 +159,17 @@ export default function AccountsScreen() {
     fetchAccounts();
   };
 
-  const handleStatusUpdate = async (status: string) => {
-    if (!selectedAccount) return;
-    
-    try {
-      // Determine the update method based on account type
-      if (selectedAccount.account_type === 'vendor') {
-        await apiService.updateVendorAccountStatus(selectedAccount.id, status);
-      } else if (selectedAccount.account_type === 'vehicle_owner') {
-        await apiService.updateVehicleOwnerAccountStatus(selectedAccount.id, status);
-      } else if (selectedAccount.account_type === 'driver' || selectedAccount.account_type === 'quickdriver') {
-        await apiService.updateDriverAccountStatus(selectedAccount.id, status);
-      }
-      
-      // Refresh the accounts list
-      fetchAccounts();
-    } catch (error) {
-      console.error('Failed to update account status:', error);
-    } finally {
-      setShowStatusSheet(false);
+  const handleAccountPress = (account: Account) => {
+    // Only navigate to documents for non-car accounts
+    if (account.account_type !== 'car') {
+      router.push({
+        pathname: '/account-documents',
+        params: {
+          accountId: account.id,
+          accountType: account.account_type,
+          accountName: account.name,
+        },
+      });
     }
   };
 
@@ -109,36 +178,19 @@ export default function AccountsScreen() {
     account.id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getStatusOptions = (accountType: string) => {
-    if (accountType === 'vendor' || accountType === 'vehicle_owner') {
-      return [
-        { label: 'Active', value: 'ACTIVE', color: '#10B981' },
-        { label: 'Inactive', value: 'INACTIVE', color: '#EF4444' },
-        { label: 'Pending', value: 'PENDING', color: '#F59E0B' },
-      ];
-    } else {
-      // Driver statuses
-      return [
-        { label: 'Online', value: 'ONLINE', color: '#10B981' },
-        { label: 'Offline', value: 'OFFLINE', color: '#6B7280' },
-        { label: 'Driving', value: 'DRIVING', color: '#3B82F6' },
-        { label: 'Blocked', value: 'BLOCKED', color: '#EF4444' },
-        { label: 'Processing', value: 'PROCESSING', color: '#F59E0B' },
-      ];
-    }
-  };
-
   const getAccountTypeIcon = (type: string) => {
     switch (type) {
       case 'vendor':
-        return <Building2 size={20} color="#3B82F6" />;
+        return <Building2 size={18} color="#3B82F6" />;
       case 'vehicle_owner':
-        return <Car size={20} color="#10B981" />;
+        return <Car size={18} color="#10B981" />;
       case 'driver':
       case 'quickdriver':
-        return <UserCircle size={20} color="#8B5CF6" />;
+        return <UserCircle size={18} color="#8B5CF6" />;
+      case 'car':
+        return <Car size={18} color="#F59E0B" />;
       default:
-        return <User size={20} color="#6B7280" />;
+        return <UserCircle size={18} color="#6B7280" />;
     }
   };
 
@@ -147,30 +199,36 @@ export default function AccountsScreen() {
       case 'vendor':
         return 'Vendor';
       case 'vehicle_owner':
-        return 'Vehicle Owner';
+        return 'Driver';
       case 'driver':
         return 'Driver';
       case 'quickdriver':
         return 'Quick Driver';
+      case 'car':
+        return 'Car';
       default:
         return type;
     }
   };
 
-  const handleAccountPress = (account: Account) => {
-    router.push({
-      pathname: '/account-documents',
-      params: {
-        accountId: account.id,
-        accountType: account.account_type,
-        accountName: account.name,
-      },
-    });
+  const getStatusLabel = (account: Account): string => {
+    const status = getStatusForAccount(account);
+    if (account.account_type === 'vendor' || account.account_type === 'vehicle_owner') {
+      if (status === 'Active' || status === 'ACTIVE') return 'Active';
+      return 'Inactive';
+    } else if (account.account_type === 'driver' || account.account_type === 'quickdriver') {
+      if (status === 'ONLINE' || status === 'DRIVING') return 'Online';
+      return 'Blocked';
+    }
+    return status;
   };
 
   const renderAccountItem = ({ item }: { item: Account }) => {
-    const isInactive = item.account_status === 'INACTIVE' || item.account_status === 'PENDING' || 
-                       item.account_status === 'OFFLINE' || item.account_status === 'PROCESSING';
+    const status = getStatusForAccount(item);
+    const isInactive = isInactiveStatus(status, item.account_type);
+    const isUpdating = updatingStatus.has(item.id);
+    const toggleValue = getToggleStatus(item);
+    const statusLabel = getStatusLabel(item);
     
     return (
       <TouchableOpacity
@@ -179,12 +237,9 @@ export default function AccountsScreen() {
           isInactive && styles.accountCardInactive,
         ]}
         onPress={() => handleAccountPress(item)}
-        onLongPress={() => {
-          setSelectedAccount(item);
-          setShowStatusSheet(true);
-        }}
+        activeOpacity={0.7}
       >
-        <View style={styles.accountHeader}>
+        <View style={styles.accountContent}>
           <View style={styles.accountInfo}>
             <View style={styles.accountTypeRow}>
               {getAccountTypeIcon(item.account_type)}
@@ -192,35 +247,36 @@ export default function AccountsScreen() {
                 {getAccountTypeLabel(item.account_type)}
               </Text>
             </View>
-            <Text style={styles.accountName}>{item.name}</Text>
-            <Text style={styles.accountId}>ID: {item.id}</Text>
+            <Text style={styles.accountName} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.accountId} numberOfLines={1}>ID: {item.id}</Text>
           </View>
+
           <View style={styles.accountActions}>
-            <StatusBadge status={item.account_status} />
-            <View style={styles.verifyButton}>
-              <FileText size={16} color="#3B82F6" />
-              <Text style={styles.verifyButtonText}>Verify</Text>
+            {item.account_type !== 'car' && (
+              <TouchableOpacity
+                style={styles.verifyButton}
+                onPress={() => handleAccountPress(item)}
+              >
+                <FileText size={14} color="#3B82F6" />
+              </TouchableOpacity>
+            )}
+            
+            <View style={styles.toggleContainer}>
+              <Text style={styles.toggleLabel}>{statusLabel}</Text>
+              <Switch
+                value={toggleValue}
+                onValueChange={(value) => handleToggleStatus(item, value)}
+                disabled={isUpdating}
+                trackColor={{ false: '#E5E7EB', true: '#10B981' }}
+                thumbColor={toggleValue ? '#FFFFFF' : '#9CA3AF'}
+                ios_backgroundColor="#E5E7EB"
+              />
             </View>
           </View>
         </View>
       </TouchableOpacity>
     );
   };
-
-  const accountTypeOptions = [
-    { label: 'All Types', value: 'all' },
-    { label: 'Vendors', value: 'vendor' },
-    { label: 'Vehicle Owners', value: 'vehicle_owner' },
-    { label: 'Drivers', value: 'driver' },
-    { label: 'Quick Drivers', value: 'quickdriver' },
-  ];
-
-  const statusFilterOptions = [
-    { label: 'All Statuses', value: 'all' },
-    { label: 'Active', value: 'active' },
-    { label: 'Inactive', value: 'inactive' },
-    { label: 'Pending', value: 'pending' },
-  ];
 
   if (loading) {
     return <LoadingSpinner />;
@@ -234,44 +290,30 @@ export default function AccountsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Accounts</Text>
-        <Text style={styles.subtitle}>
-          {totalCount} total • {activeCount} active • {inactiveCount} inactive
-        </Text>
-      </View>
-
-      <View style={styles.filtersContainer}>
-        <View style={styles.filterRow}>
-          <View style={styles.filterChip}>
-            <Filter size={16} color="#6B7280" />
-            <Text style={styles.filterLabel}>Type:</Text>
-            <Text style={styles.filterValue}>
-              {accountTypeOptions.find(opt => opt.value === accountTypeFilter)?.label || 'All'}
-            </Text>
-          </View>
-          <View style={styles.filterChip}>
-            <Filter size={16} color="#6B7280" />
-            <Text style={styles.filterLabel}>Status:</Text>
-            <Text style={styles.filterValue}>
-              {statusFilterOptions.find(opt => opt.value === statusFilter)?.label || 'All'}
-            </Text>
-          </View>
-        </View>
+        <Text style={styles.subtitle}>{accounts.length} total accounts</Text>
       </View>
 
       <View style={styles.searchContainer}>
-        <Search size={20} color="#6B7280" />
+        <Search size={18} color="#6B7280" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search accounts by name or ID..."
+          placeholder="Search by name or ID..."
           value={searchQuery}
           onChangeText={setSearchQuery}
+          placeholderTextColor="#9CA3AF"
         />
       </View>
 
+      {/* Account Type Filters */}
       <View style={styles.filterButtons}>
         <FlatList
           horizontal
-          data={accountTypeOptions}
+          data={[
+            { label: 'All Types', value: 'all' },
+            { label: 'Vendors', value: 'vendor' },
+            { label: 'Drivers', value: 'vehicle_owner' },
+            { label: 'Quick Drivers', value: 'quickdriver' },
+          ]}
           keyExtractor={(item) => item.value}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -279,7 +321,7 @@ export default function AccountsScreen() {
                 styles.filterButton,
                 accountTypeFilter === item.value && styles.filterButtonActive,
               ]}
-              onPress={() => setAccountTypeFilter(item.value as AccountTypeFilter)}
+              onPress={() => setAccountTypeFilter(item.value as any)}
             >
               <Text
                 style={[
@@ -296,10 +338,16 @@ export default function AccountsScreen() {
         />
       </View>
 
+      {/* Status Filters */}
       <View style={styles.filterButtons}>
         <FlatList
           horizontal
-          data={statusFilterOptions}
+          data={[
+            { label: 'All Statuses', value: 'all' },
+            { label: 'Active', value: 'active' },
+            { label: 'Inactive', value: 'inactive' },
+            { label: 'Pending', value: 'pending' },
+          ]}
           keyExtractor={(item) => item.value}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -307,7 +355,7 @@ export default function AccountsScreen() {
                 styles.filterButton,
                 statusFilter === item.value && styles.filterButtonActive,
               ]}
-              onPress={() => setStatusFilter(item.value as StatusFilter)}
+              onPress={() => setStatusFilter(item.value as any)}
             >
               <Text
                 style={[
@@ -339,16 +387,6 @@ export default function AccountsScreen() {
           </View>
         }
       />
-
-      {selectedAccount && (
-        <ActionSheet
-          visible={showStatusSheet}
-          onClose={() => setShowStatusSheet(false)}
-          title={`Update ${getAccountTypeLabel(selectedAccount.account_type)} Status`}
-          options={getStatusOptions(selectedAccount.account_type)}
-          onSelect={handleStatusUpdate}
-        />
-      )}
     </SafeAreaView>
   );
 }
@@ -360,77 +398,49 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingVertical: 16,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     color: '#1F2937',
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  filtersContainer: {
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  filterRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-  },
-  filterLabel: {
     fontSize: 14,
     color: '#6B7280',
-    fontWeight: '500',
-  },
-  filterValue: {
-    fontSize: 14,
-    color: '#1F2937',
-    fontWeight: '600',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
     marginHorizontal: 20,
-    marginVertical: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 12,
+    marginTop: 12,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 10,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 1,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 1,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     color: '#1F2937',
+    padding: 0,
   },
   filterButtons: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   filterButtonsContainer: {
     paddingHorizontal: 20,
@@ -460,71 +470,72 @@ const styles = StyleSheet.create({
   },
   accountCard: {
     backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   accountCardInactive: {
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
     borderLeftColor: '#F59E0B',
     backgroundColor: '#FFFBEB',
   },
-  accountHeader: {
+  accountContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  accountActions: {
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  verifyButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  verifyButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#3B82F6',
   },
   accountInfo: {
     flex: 1,
-    gap: 8,
+    gap: 6,
+    marginRight: 12,
   },
   accountTypeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   accountTypeLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#6B7280',
     textTransform: 'uppercase',
   },
   accountName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
   },
   accountId: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#9CA3AF',
     fontFamily: 'monospace',
+  },
+  accountActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  verifyButton: {
+    padding: 8,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 8,
+  },
+  toggleContainer: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  toggleLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#6B7280',
   },
   emptyContainer: {
     paddingVertical: 40,
@@ -535,4 +546,3 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 });
-

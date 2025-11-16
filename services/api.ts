@@ -41,10 +41,32 @@ class ApiService {
         let errorMessage = `HTTP error! status: ${response.status}`;
         try {
           const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.message || errorJson.detail || errorMessage;
+          // Handle different error response formats
+          if (typeof errorJson === 'string') {
+            errorMessage = errorJson;
+          } else if (errorJson.message) {
+            errorMessage = errorJson.message;
+          } else if (errorJson.detail) {
+            errorMessage = Array.isArray(errorJson.detail) 
+              ? errorJson.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ')
+              : errorJson.detail;
+          } else if (errorJson.error) {
+            errorMessage = errorJson.error;
+          } else {
+            errorMessage = JSON.stringify(errorJson);
+          }
         } catch {
           errorMessage = errorText || errorMessage;
         }
+        
+        // Log the full error for debugging
+        console.error(`API Error [${response.status}]:`, {
+          url,
+          status: response.status,
+          error: errorMessage,
+          errorText,
+        });
+        
         throw new Error(errorMessage);
       }
       
@@ -52,8 +74,18 @@ class ApiService {
       return data;
     } catch (error) {
       console.error('API request failed:', error);
-      if (!skipLogoutOnError) {
-        this.logout();
+      // Only logout on authentication errors (401, 403), not on other errors like 422, 404, etc.
+      // Don't logout on skipLogoutOnError flag (used for login)
+      if (!skipLogoutOnError && error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+        // Check for authentication-related errors
+        if (errorMessage.includes('not authenticated') || 
+            errorMessage.includes('unauthorized') || 
+            errorMessage.includes('401') ||
+            errorMessage.includes('403') ||
+            errorMessage.includes('token')) {
+          this.logout();
+        }
       }
       throw error;
     }
@@ -81,7 +113,7 @@ class ApiService {
   async getAllAccounts(
     skip = 0, 
     limit = 100, 
-    accountType?: 'vendor' | 'vehicle_owner' | 'driver' | 'quickdriver',
+    accountType?: 'vendor' | 'vehicle_owner' | 'driver' | 'quickdriver' | 'car',
     statusFilter?: 'active' | 'inactive' | 'pending' | string
   ): Promise<{
     accounts: Array<{
@@ -162,6 +194,41 @@ class ApiService {
     });
   }
 
+  // Unified Account Status Update
+  async updateAccountStatus(
+    accountId: string,
+    accountType: 'vendor' | 'vehicle_owner' | 'driver' | 'quickdriver' | 'car',
+    status: string
+  ): Promise<{
+    message: string;
+    id: string;
+    new_status: string;
+  }> {
+    // Ensure accountId is a string
+    const accountIdStr = String(accountId);
+    
+    if (accountType === 'car') {
+      return this.makeRequest(`/admin/cars/${accountIdStr}/account-status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ account_status: status }),
+      });
+    }
+    
+    // Map vehicle_owner to driver for the API endpoint (backend uses 'driver' for vehicle_owner)
+    const apiAccountType = accountType === 'vehicle_owner' ? 'driver' : accountType;
+    
+    // For drivers and quickdrivers, backend might expect account_status but maps it to driver_status internally
+    // Try account_status first, as the unified endpoint might handle the mapping
+    const bodyField = (accountType === 'driver' || accountType === 'quickdriver') 
+      ? { account_status: status }  // Try account_status first
+      : { account_status: status };
+    
+    return this.makeRequest(`/admin/accounts/${accountIdStr}/status?account_type=${apiAccountType}`, {
+      method: 'PATCH',
+      body: JSON.stringify(bodyField),
+    });
+  }
+
   // Vendors
   async getVendors(skip = 0, limit = 100): Promise<{ vendors: any[]; total_count: number }> {
     return this.makeRequest(`/admin-vendor/vendors?skip=${skip}&limit=${limit}`);
@@ -209,6 +276,43 @@ class ApiService {
   }
 
   // Cars
+  async getCars(
+    skip = 0,
+    limit = 100,
+    statusFilter?: 'ONLINE' | 'DRIVING' | 'BLOCKED' | 'PROCESSING' | string,
+    carTypeFilter?: string,
+    vehicleOwnerId?: string
+  ): Promise<{
+    cars: Array<{
+      id: string;
+      vehicle_owner_id: string;
+      car_name: string;
+      car_type: string;
+      car_number: string;
+      year_of_the_car: string;
+      car_status: string;
+      vehicle_owner_name: string;
+      created_at: string;
+    }>;
+    total_count: number;
+    online_count: number;
+    blocked_count: number;
+    processing_count: number;
+    driving_count: number;
+  }> {
+    let queryParams = `skip=${skip}&limit=${limit}`;
+    if (statusFilter) {
+      queryParams += `&status_filter=${statusFilter}`;
+    }
+    if (carTypeFilter) {
+      queryParams += `&car_type_filter=${carTypeFilter}`;
+    }
+    if (vehicleOwnerId) {
+      queryParams += `&vehicle_owner_id=${vehicleOwnerId}`;
+    }
+    return this.makeRequest(`/admin/cars?${queryParams}`);
+  }
+
   async updateCarAccountStatus(carId: string, status: string): Promise<any> {
     return this.makeRequest(`/admin/cars/${carId}/account-status`, {
       method: 'PATCH',
