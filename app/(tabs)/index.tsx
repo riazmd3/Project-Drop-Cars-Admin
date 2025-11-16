@@ -8,7 +8,8 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Users, Car, CreditCard, TrendingUp, Clock, CircleCheck as CheckCircle, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Users, Car, CreditCard, TrendingUp, Clock, Wallet, ChevronRight } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { apiService } from '@/services/api';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
@@ -20,6 +21,7 @@ interface DashboardStats {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats>({
     totalVendors: 0,
     totalVehicleOwners: 0,
@@ -131,38 +133,52 @@ export default function Dashboard() {
           </View>
         </View>
 
-        <View style={styles.quickActions}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          
-          <TouchableOpacity style={styles.actionButton}>
-            <CheckCircle size={20} color="#10B981" />
-            <Text style={styles.actionText}>Review Pending Documents</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionButton}>
-            <CreditCard size={20} color="#3B82F6" />
-            <Text style={styles.actionText}>Process Transfer Requests</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionButton}>
-            <AlertCircle size={20} color="#F59E0B" />
-            <Text style={styles.actionText}>Review Account Issues</Text>
-          </TouchableOpacity>
-        </View>
+        <View style={styles.navigationSection}>
+          <Text style={styles.sectionTitle}>Quick Navigation</Text>
+          <View style={styles.navigationGrid}>
+            <TouchableOpacity 
+              style={styles.navBox}
+              onPress={() => router.push('/(tabs)/accounts')}
+            >
+              <View style={[styles.navIconContainer, { backgroundColor: '#EFF6FF' }]}>
+                <Users size={28} color="#3B82F6" />
+              </View>
+              <Text style={styles.navLabel}>Accounts</Text>
+              <ChevronRight size={20} color="#9CA3AF" style={styles.navArrow} />
+            </TouchableOpacity>
 
-        <View style={styles.recentActivity}>
-          <Text style={styles.sectionTitle}>System Status</Text>
-          <View style={styles.statusItem}>
-            <View style={[styles.statusIndicator, { backgroundColor: '#10B981' }]} />
-            <Text style={styles.statusText}>All systems operational</Text>
-          </View>
-          <View style={styles.statusItem}>
-            <View style={[styles.statusIndicator, { backgroundColor: '#3B82F6' }]} />
-            <Text style={styles.statusText}>API services running</Text>
-          </View>
-          <View style={styles.statusItem}>
-            <View style={[styles.statusIndicator, { backgroundColor: '#10B981' }]} />
-            <Text style={styles.statusText}>Database connected</Text>
+            <TouchableOpacity 
+              style={styles.navBox}
+              onPress={() => router.push('/(tabs)/cars')}
+            >
+              <View style={[styles.navIconContainer, { backgroundColor: '#F0FDF4' }]}>
+                <Car size={28} color="#10B981" />
+              </View>
+              <Text style={styles.navLabel}>Cars</Text>
+              <ChevronRight size={20} color="#9CA3AF" style={styles.navArrow} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.navBox}
+              onPress={() => router.push('/(tabs)/transfers')}
+            >
+              <View style={[styles.navIconContainer, { backgroundColor: '#FEF3C7' }]}>
+                <CreditCard size={28} color="#F59E0B" />
+              </View>
+              <Text style={styles.navLabel}>Transfers</Text>
+              <ChevronRight size={20} color="#9CA3AF" style={styles.navArrow} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.navBox}
+              onPress={() => router.push('/(tabs)/wallet')}
+            >
+              <View style={[styles.navIconContainer, { backgroundColor: '#F3E8FF' }]}>
+                <Wallet size={28} color="#8B5CF6" />
+              </View>
+              <Text style={styles.navLabel}>Wallet</Text>
+              <ChevronRight size={20} color="#9CA3AF" style={styles.navArrow} />
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -257,19 +273,9 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '500',
   },
-  quickActions: {
+  navigationSection: {
     margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    marginTop: 0,
   },
   sectionTitle: {
     fontSize: 18,
@@ -277,27 +283,19 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginBottom: 16,
   },
-  actionButton: {
+  navigationGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    marginBottom: 12,
+    flexWrap: 'wrap',
     gap: 12,
   },
-  actionText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1F2937',
-  },
-  recentActivity: {
-    margin: 20,
-    marginTop: 0,
+  navBox: {
+    flex: 1,
+    minWidth: '47%',
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -306,20 +304,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  statusItem: {
-    flexDirection: 'row',
+  navIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 8,
-    gap: 12,
+    marginRight: 12,
   },
-  statusIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  navLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
   },
-  statusText: {
-    fontSize: 14,
-    color: '#6B7280',
+  navArrow: {
+    marginLeft: 8,
   },
 });

@@ -30,6 +30,22 @@ interface CarItem {
 
 type StatusFilter = 'all' | 'ONLINE' | 'DRIVING' | 'BLOCKED' | 'PROCESSING';
 
+const CAR_TYPES = [
+  'HATCHBACK',
+  'SEDAN_4_PLUS_1',
+  'NEW_SEDAN_2022_MODEL',
+  'ETIOS_4_PLUS_1',
+  'SUV',
+  'SUV_6_PLUS_1',
+  'SUV_7_PLUS_1',
+  'INNOVA',
+  'INNOVA_6_PLUS_1',
+  'INNOVA_7_PLUS_1',
+  'INNOVA_CRYSTA',
+  'INNOVA_CRYSTA_6_PLUS_1',
+  'INNOVA_CRYSTA_7_PLUS_1',
+];
+
 export default function CarsScreen() {
   const [cars, setCars] = useState<CarItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +54,8 @@ export default function CarsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [carTypeFilter, setCarTypeFilter] = useState<string>('all');
+  const [vehicleOwnerIdFilter, setVehicleOwnerIdFilter] = useState<string>('');
   const [totalCount, setTotalCount] = useState(0);
   const [onlineCount, setOnlineCount] = useState(0);
   const [blockedCount, setBlockedCount] = useState(0);
@@ -48,8 +66,10 @@ export default function CarsScreen() {
     try {
       setError(null);
       const statusParam = statusFilter !== 'all' ? statusFilter : undefined;
+      const carTypeParam = carTypeFilter !== 'all' ? carTypeFilter : undefined;
+      const vehicleOwnerParam = vehicleOwnerIdFilter.trim() || undefined;
       
-      const data = await apiService.getCars(0, 100, statusParam);
+      const data = await apiService.getCars(0, 100, statusParam, carTypeParam, vehicleOwnerParam);
       
       // Sort cars: blocked/processing first, then online/driving
       const sortedCars = [...data.cars].sort((a, b) => {
@@ -78,7 +98,7 @@ export default function CarsScreen() {
 
   useEffect(() => {
     fetchCars();
-  }, [statusFilter]);
+  }, [statusFilter, carTypeFilter, vehicleOwnerIdFilter]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -136,11 +156,21 @@ export default function CarsScreen() {
     }
   };
 
-  const filteredCars = cars.filter(car =>
-    car.car_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    car.car_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    car.vehicle_owner_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCars = cars.filter(car => {
+    const matchesSearch = 
+      car.car_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      car.car_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      car.vehicle_owner_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      car.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      car.vehicle_owner_id.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // If search query looks like an ID, also check vehicle_owner_id
+    if (searchQuery.trim().length > 0 && searchQuery.includes('-')) {
+      return matchesSearch || car.vehicle_owner_id.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+    
+    return matchesSearch;
+  });
 
   const getStatusLabel = (status: string): string => {
     switch (status) {
@@ -195,7 +225,13 @@ export default function CarsScreen() {
             <Text style={styles.carNumber}>{item.car_number}</Text>
             <Text style={styles.carType}>{item.car_type} • {item.year_of_the_car}</Text>
             <Text style={styles.ownerName}>Owner: {item.vehicle_owner_name}</Text>
-            <Text style={styles.carId} numberOfLines={1}>ID: {item.id}</Text>
+            <TouchableOpacity 
+              onPress={() => setVehicleOwnerIdFilter(item.vehicle_owner_id)}
+              style={styles.ownerIdButton}
+            >
+              <Text style={styles.ownerIdText}>Owner ID: {item.vehicle_owner_id.substring(0, 8)}...</Text>
+            </TouchableOpacity>
+            <Text style={styles.carId} numberOfLines={1}>Car ID: {item.id.substring(0, 8)}...</Text>
           </View>
 
           <View style={styles.carActions}>
@@ -228,9 +264,13 @@ export default function CarsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Cars</Text>
-        <Text style={styles.subtitle}>
-          {totalCount} total • {onlineCount} online • {blockedCount} blocked
-        </Text>
+        <View style={styles.statsRow}>
+          <Text style={styles.statItem}>Total: {totalCount}</Text>
+          <Text style={[styles.statItem, { color: '#10B981' }]}>Online: {onlineCount}</Text>
+          <Text style={[styles.statItem, { color: '#EF4444' }]}>Blocked: {blockedCount}</Text>
+          <Text style={[styles.statItem, { color: '#F59E0B' }]}>Processing: {processingCount}</Text>
+          <Text style={[styles.statItem, { color: '#3B82F6' }]}>Driving: {drivingCount}</Text>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -243,6 +283,16 @@ export default function CarsScreen() {
           placeholderTextColor="#9CA3AF"
         />
       </View>
+
+      {/* Vehicle Owner ID Filter */}
+      {vehicleOwnerIdFilter.length > 0 && (
+        <View style={styles.filterChip}>
+          <Text style={styles.filterChipText}>Owner ID: {vehicleOwnerIdFilter}</Text>
+          <TouchableOpacity onPress={() => setVehicleOwnerIdFilter('')}>
+            <Text style={styles.filterChipClose}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Status Filters */}
       <View style={styles.filterButtons}>
@@ -269,6 +319,42 @@ export default function CarsScreen() {
                   styles.filterButtonText,
                   statusFilter === item.value && styles.filterButtonTextActive,
                 ]}
+              >
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          )}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterButtonsContainer}
+        />
+      </View>
+
+      {/* Car Type Filters */}
+      <View style={styles.filterButtons}>
+        <FlatList
+          horizontal
+          data={[
+            { label: 'All Types', value: 'all' },
+            ...CAR_TYPES.map(type => ({
+              label: type.replace(/_/g, ' '),
+              value: type,
+            })),
+          ]}
+          keyExtractor={(item) => item.value}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                carTypeFilter === item.value && styles.filterButtonActive,
+              ]}
+              onPress={() => setCarTypeFilter(item.value)}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  carTypeFilter === item.value && styles.filterButtonTextActive,
+                ]}
+                numberOfLines={1}
               >
                 {item.label}
               </Text>
@@ -319,6 +405,46 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  statItem: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginHorizontal: 20,
+    marginBottom: 8,
+    gap: 8,
+  },
+  filterChipText: {
+    fontSize: 12,
+    color: '#3B82F6',
+    fontWeight: '500',
+  },
+  filterChipClose: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: 'bold',
+  },
+  ownerIdButton: {
+    marginTop: 4,
+  },
+  ownerIdText: {
+    fontSize: 11,
+    color: '#3B82F6',
+    fontFamily: 'monospace',
   },
   searchContainer: {
     flexDirection: 'row',
