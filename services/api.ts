@@ -336,6 +336,16 @@ class ApiService {
     });
   }
 
+  // Orders
+  async getOrders(skip = 0, limit = 100): Promise<{
+    orders: any[];
+    total_count: number;
+    skip: number;
+    limit: number;
+  }> {
+    return this.makeRequest(`/admin/orders?skip=${skip}&limit=${limit}`);
+  }
+
   // Transfers
   async getPendingTransfers(skip = 0, limit = 100): Promise<{ transactions: any[]; total_count: number }> {
     return this.makeRequest(`/admin/transfers/pending?skip=${skip}&limit=${limit}`);

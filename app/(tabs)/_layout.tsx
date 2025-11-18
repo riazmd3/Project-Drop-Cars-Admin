@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Hop as Home, Users, CreditCard, Wallet, Car } from 'lucide-react-native';
+import { Hop as Home, Users, CreditCard, Wallet, Car, Package } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -55,6 +55,15 @@ export default function TabLayout() {
           title: 'Transfers',
           tabBarIcon: ({ size, color }) => (
             <CreditCard size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="orders"
+        options={{
+          title: 'Orders',
+          tabBarIcon: ({ size, color }) => (
+            <Package size={size} color={color} />
           ),
         }}
       />

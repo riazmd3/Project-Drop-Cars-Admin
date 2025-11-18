@@ -8,7 +8,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Users, Car, CreditCard, TrendingUp, Clock, Wallet, ChevronRight, LogOut } from 'lucide-react-native';
+import { Users, Car, CreditCard, TrendingUp, Clock, Wallet, Package, ChevronRight, LogOut } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { apiService } from '@/services/api';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -138,6 +138,17 @@ export default function Dashboard() {
                 <CreditCard size={28} color="#F59E0B" />
               </View>
               <Text style={styles.navLabel}>Transfers</Text>
+              <ChevronRight size={20} color="#9CA3AF" style={styles.navArrow} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.navBox}
+              onPress={() => router.push('/(tabs)/orders')}
+            >
+              <View style={[styles.navIconContainer, { backgroundColor: '#FEF2F2' }]}>
+                <Package size={28} color="#EF4444" />
+              </View>
+              <Text style={styles.navLabel}>Orders</Text>
               <ChevronRight size={20} color="#9CA3AF" style={styles.navArrow} />
             </TouchableOpacity>
 
