@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// const BASE_URL = 'http://172.20.10.7:8000/api';
+// const BASE_URL = 'http://192.168.1.11:8000/api';
 const BASE_URL = 'https://drop-cars-api-1049299844333.asia-south2.run.app/api';
 
 class ApiService {
@@ -60,12 +60,19 @@ class ApiService {
         }
         
         // Log the full error for debugging
+
+        if(response.status === 404){
+          console.log("Users not found:");
+        }else{
         console.error(`API Error [${response.status}]:`, {
           url,
           status: response.status,
           error: errorMessage,
           errorText,
         });
+        }
+
+
         
         throw new Error(errorMessage);
       }
@@ -73,7 +80,7 @@ class ApiService {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('API request failed:', error);
+      // console.error('API request failed:', error);
       // Only logout on authentication errors (401, 403), not on other errors like 422, 404, etc.
       // Don't logout on skipLogoutOnError flag (used for login)
       if (!skipLogoutOnError && error instanceof Error) {
@@ -360,6 +367,14 @@ class ApiService {
 
   async getTransferDetails(transactionId: string): Promise<any> {
     return this.makeRequest(`/admin/transfers/${transactionId}`);
+  }
+
+   async getAdminProfile(): Promise<any> {
+    return this.makeRequest(`/admin/profile`);
+  }
+
+ async getAdminLedger(): Promise<any> {
+    return this.makeRequest(`/admin/acccount-ledger`);
   }
 
   // Wallet Management
