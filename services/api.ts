@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://10.59.192.145:8000/api';
+// const BASE_URL = 'http://10.115.254.247:8000/api';
 // const BASE_URL = 'https://drop-cars-api-1049299844333.asia-south2.run.app/api';
+const BASE_URL = 'https://drop-cars-api-207918408785.asia-south2.run.app/api';
 
 class ApiService {
   private async getAuthToken(): Promise<string | null> {
@@ -60,12 +61,19 @@ class ApiService {
         }
         
         // Log the full error for debugging
+
+        if(response.status === 404){
+          console.log("Users not found:");
+        }else{
         console.error(`API Error [${response.status}]:`, {
           url,
           status: response.status,
           error: errorMessage,
           errorText,
         });
+        }
+
+
         
         throw new Error(errorMessage);
       }
@@ -73,7 +81,7 @@ class ApiService {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('API request failed:', error);
+      // console.error('API request failed:', error);
       // Only logout on authentication errors (401, 403), not on other errors like 422, 404, etc.
       // Don't logout on skipLogoutOnError flag (used for login)
       if (!skipLogoutOnError && error instanceof Error) {
@@ -362,6 +370,14 @@ class ApiService {
     return this.makeRequest(`/admin/transfers/${transactionId}`);
   }
 
+   async getAdminProfile(): Promise<any> {
+    return this.makeRequest(`/admin/profile`);
+  }
+
+ async getAdminLedger(): Promise<any> {
+    return this.makeRequest(`/admin/acccount-ledger`);
+  }
+
   // Wallet Management
   async searchVehicleOwner(primaryNumber: string): Promise<any> {
     return this.makeRequest('/admin/search-vehicle-owner', {
@@ -389,3 +405,63 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
+
+import axios from 'axios';
+
+// const API_BASE_URL = 'http://10.115.254.247:8000';
+const api = axios.create({
+  baseURL: BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Attach JWT automatically
+api.interceptors.request.use(
+  async (config) => {
+    const token = await AsyncStorage.getItem('auth_token');
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+
+// ✅ 1️⃣ Search User (JSON BODY)
+export const searchUserDetails = async (
+  role: string,
+  primaryNumber: string
+) => {
+  const response = await api.post(
+    '/admin/search-user/details',
+    {
+      role: role,
+      primary_number: primaryNumber,
+    }
+  );
+
+  return response.data;
+};
+
+
+// ✅ 2️⃣ Reset Password (JSON BODY)
+export const resetUserPassword = async (
+  role: string,
+  id: string,
+  password: string
+) => {
+  const response = await api.post(
+    '/admin/search-user/reset-password',
+    {
+      role: role,
+      id: id,
+      password: password,
+    }
+  );
+
+  return response.data;
+};

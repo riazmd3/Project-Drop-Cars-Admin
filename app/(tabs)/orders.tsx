@@ -64,6 +64,7 @@ interface Order {
   estimated_price?: number;
   vendor_price?: number;
   platform_fees_percent?: number;
+  vendor_fees_percent?: number;
   closed_vendor_price?: number;
   closed_driver_price?: number;
   commision_amount?: number;
@@ -508,6 +509,16 @@ export default function OrdersScreen() {
                   <Text style={styles.detailValue}>{selectedOrder.platform_fees_percent}%</Text>
                 </View>
               )}
+
+              {selectedOrder.vendor_fees_percent && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Vendor Fees:</Text>
+                  <Text style={styles.detailValue}>{selectedOrder.vendor_fees_percent}%</Text>
+                </View>
+              )}
+
+
+              
               {selectedOrder.closed_vendor_price && (
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Closed Vendor Price:</Text>
