@@ -9,9 +9,12 @@ import {
   TextInput,
   Switch,
   Alert,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Car } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Search, Car, Info, FileText } from 'lucide-react-native';
 import { apiService } from '@/services/api';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ErrorMessage from '@/components/ErrorMessage';
@@ -47,6 +50,7 @@ const CAR_TYPES = [
 ];
 
 export default function CarsScreen() {
+  const router = useRouter();
   const [cars, setCars] = useState<CarItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -61,6 +65,8 @@ export default function CarsScreen() {
   const [blockedCount, setBlockedCount] = useState(0);
   const [processingCount, setProcessingCount] = useState(0);
   const [drivingCount, setDrivingCount] = useState(0);
+  const [selectedCar, setSelectedCar] = useState<CarItem | null>(null);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   const fetchCars = async () => {
     try {
@@ -202,6 +208,22 @@ export default function CarsScreen() {
     }
   };
 
+  const handleDocumentPress = (car: CarItem) => {
+    router.push({
+      pathname: '/car-documents',
+      params: {
+        carId: car.id,
+        vehicleOwnerId: car.vehicle_owner_id,
+        carName: car.car_name,
+      },
+    });
+  };
+
+  const handleInfoPress = (car: CarItem) => {
+    setSelectedCar(car);
+    setShowInfoModal(true);
+  };
+
   const renderCarItem = ({ item }: { item: CarItem }) => {
     const isInactive = isInactiveStatus(item.car_status);
     const isUpdating = updatingStatus.has(item.id);
@@ -221,6 +243,22 @@ export default function CarsScreen() {
             <View style={styles.carHeader}>
               <Car size={18} color="#3B82F6" />
               <Text style={styles.carName} numberOfLines={1}>{item.car_name}</Text>
+              <View style={styles.carHeaderActions}>
+                <TouchableOpacity
+                  style={styles.carActionButton}
+                  onPress={() => handleInfoPress(item)}
+                >
+                  <Info size={14} color="#3B82F6" />
+                  <Text style={styles.carActionButtonText}>Info</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.carActionButton}
+                  onPress={() => handleDocumentPress(item)}
+                >
+                  <FileText size={14} color="#10B981" />
+                  <Text style={styles.carActionButtonText}>Document</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             <Text style={styles.carNumber}>{item.car_number}</Text>
             <Text style={styles.carType}>{item.car_type} • {item.year_of_the_car}</Text>
@@ -380,6 +418,70 @@ export default function CarsScreen() {
           </View>
         }
       />
+
+      {/* Car Info Modal */}
+      {selectedCar && (
+        <Modal
+          visible={showInfoModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowInfoModal(false)}
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Car Details</Text>
+              <TouchableOpacity
+                onPress={() => setShowInfoModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Text style={styles.modalCloseButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalContent}>
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Basic Information</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Car Name:</Text>
+                  <Text style={styles.detailValue}>{selectedCar.car_name}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Car Number:</Text>
+                  <Text style={styles.detailValue}>{selectedCar.car_number}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Car Type:</Text>
+                  <Text style={styles.detailValue}>{selectedCar.car_type}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Year:</Text>
+                  <Text style={styles.detailValue}>{selectedCar.year_of_the_car}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Status:</Text>
+                  <Text style={[styles.detailValue, { color: getStatusColor(selectedCar.car_status) }]}>
+                    {getStatusLabel(selectedCar.car_status)}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Car ID:</Text>
+                  <Text style={[styles.detailValue, { fontFamily: 'monospace', fontSize: 12 }]}>{selectedCar.id}</Text>
+                </View>
+              </View>
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Vehicle Owner</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Name:</Text>
+                  <Text style={styles.detailValue}>{selectedCar.vehicle_owner_name}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Owner ID:</Text>
+                  <Text style={[styles.detailValue, { fontFamily: 'monospace', fontSize: 12 }]}>{selectedCar.vehicle_owner_id}</Text>
+                </View>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -540,6 +642,95 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     flex: 1,
+  },
+  carHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  carActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+  },
+  carActionButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  modalCloseButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  modalCloseButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3B82F6',
+  },
+  modalContent: {
+    flex: 1,
+    padding: 20,
+  },
+  detailSection: {
+    marginBottom: 24,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  detailSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  detailValue: {
+    fontSize: 14,
+    color: '#1F2937',
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
+    marginLeft: 12,
   },
   carNumber: {
     fontSize: 14,

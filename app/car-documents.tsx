@@ -45,15 +45,24 @@ interface DocumentsResponse {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-export default function AccountDocumentsScreen() {
+function ensureString(p: string | string[] | undefined): string {
+  if (p === undefined) return '';
+  return Array.isArray(p) ? p[0] ?? '' : p;
+}
+
+export default function CarDocumentsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    accountId: string;
-    accountType: 'vendor' | 'vehicle_owner' | 'driver' | 'quickdriver';
-    accountName: string;
+  const rawParams = useLocalSearchParams<{
+    carId: string;
+    vehicleOwnerId: string;
+    carName: string;
   }>();
+  const carId = ensureString(rawParams.carId);
+  const vehicleOwnerId = ensureString(rawParams.vehicleOwnerId);
+  const carName = ensureString(rawParams.carName);
 
   const [documents, setDocuments] = useState<DocumentsResponse | null>(null);
+  const [carDocuments, setCarDocuments] = useState<DocumentItem[]>([]);
   const [currentDocIndex, setCurrentDocIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -74,29 +83,29 @@ export default function AccountDocumentsScreen() {
   };
 
   useEffect(() => {
-    if (params.accountId && params.accountType) {
+    if (vehicleOwnerId && carId) {
       fetchDocuments();
     }
-  }, [params.accountId, params.accountType]);
+  }, [vehicleOwnerId, carId]);
 
   const fetchDocuments = async () => {
     try {
       setError(null);
-      const data = await apiService.getAccountDocuments(
-        params.accountId!,
-        params.accountType!
-      );
+      const data = await apiService.getAccountDocuments(vehicleOwnerId, 'vehicle_owner');
       setDocuments(data);
-      
-      // Find first pending document
-      const allDocs = [...data.account_documents, ...data.car_documents];
-      const firstPendingIndex = allDocs.findIndex(doc => doc.status === 'PENDING');
+      const forThisCar = (data.car_documents || []).filter(
+        (doc: DocumentItem) => String(doc.car_id) === String(carId)
+      );
+      setCarDocuments(forThisCar);
+      const firstPendingIndex = forThisCar.findIndex((doc: DocumentItem) => doc.status === 'PENDING');
       if (firstPendingIndex !== -1) {
         setCurrentDocIndex(firstPendingIndex);
+      } else {
+        setCurrentDocIndex(0);
       }
-    } catch (error: any) {
-      console.error('Failed to fetch documents:', error);
-      setError(error?.message || 'Failed to load documents. Please try again.');
+    } catch (err: any) {
+      console.error('Failed to fetch documents:', err);
+      setError(err?.message || 'Failed to load documents. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -112,19 +121,16 @@ export default function AccountDocumentsScreen() {
     setUpdating(true);
     try {
       await apiService.updateDocumentStatus(
-        params.accountId!,
+        vehicleOwnerId,
         documentId,
-        params.accountType!,
+        'vehicle_owner',
         status
       );
-      
-      // Refresh documents
       await fetchDocuments();
-      
       Alert.alert('Success', 'Document status updated successfully');
-    } catch (error: any) {
-      console.error('Failed to update document:', error);
-      Alert.alert('Error', error?.message || 'Failed to update document status');
+    } catch (err: any) {
+      console.error('Failed to update document:', err);
+      Alert.alert('Error', err?.message || 'Failed to update document status');
     } finally {
       setUpdating(false);
     }
@@ -164,20 +170,30 @@ export default function AccountDocumentsScreen() {
     return <ErrorMessage message={error} onRetry={fetchDocuments} />;
   }
 
-  if (!documents) {
+  const pendingCount = carDocuments.filter((d) => d.status === 'PENDING').length;
+  const verifiedCount = carDocuments.filter((d) => d.status === 'VERIFIED').length;
+  const invalidCount = carDocuments.filter((d) => d.status === 'INVALID').length;
+
+  if (carDocuments.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ArrowLeft size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>{carName || 'Car'} - Documents</Text>
+          </View>
+        </View>
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No documents found</Text>
+          <FileText size={48} color="#9CA3AF" />
+          <Text style={styles.emptyText}>No documents found for this car</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // Combine all documents
-  const allDocuments = [...documents.account_documents, ...documents.car_documents];
-  const currentDocument = allDocuments[currentDocIndex];
-
+  const currentDocument = carDocuments[currentDocIndex];
   if (!currentDocument) {
     return (
       <SafeAreaView style={styles.container}>
@@ -189,15 +205,11 @@ export default function AccountDocumentsScreen() {
   }
 
   const handlePrevious = () => {
-    if (currentDocIndex > 0) {
-      setCurrentDocIndex(currentDocIndex - 1);
-    }
+    if (currentDocIndex > 0) setCurrentDocIndex(currentDocIndex - 1);
   };
 
   const handleNext = () => {
-    if (currentDocIndex < allDocuments.length - 1) {
-      setCurrentDocIndex(currentDocIndex + 1);
-    }
+    if (currentDocIndex < carDocuments.length - 1) setCurrentDocIndex(currentDocIndex + 1);
   };
 
   const handleVerify = () => {
@@ -206,10 +218,7 @@ export default function AccountDocumentsScreen() {
       `Are you sure you want to verify "${currentDocument.document_name}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Verify',
-          onPress: () => updateDocumentStatus(currentDocument.document_id, 'VERIFIED'),
-        },
+        { text: 'Verify', onPress: () => updateDocumentStatus(currentDocument.document_id, 'VERIFIED') },
       ]
     );
   };
@@ -229,13 +238,13 @@ export default function AccountDocumentsScreen() {
     );
   };
 
-  const docsToVerify = allDocuments.filter((d) => d.status !== 'VERIFIED');
+  const docsToVerify = carDocuments.filter((d) => d.status !== 'VERIFIED');
   const canVerifyAll = docsToVerify.length > 0;
 
   const handleVerifyAll = () => {
     Alert.alert(
       'Verify All Documents',
-      `Are you sure you want to verify all ${docsToVerify.length} document(s)? This includes account and car documents.`,
+      `Are you sure you want to verify all ${docsToVerify.length} document(s) for this car?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -245,17 +254,17 @@ export default function AccountDocumentsScreen() {
             try {
               for (const doc of docsToVerify) {
                 await apiService.updateDocumentStatus(
-                  params.accountId!,
+                  vehicleOwnerId,
                   doc.document_id,
-                  params.accountType!,
+                  'vehicle_owner',
                   'VERIFIED'
                 );
               }
               await fetchDocuments();
               Alert.alert('Success', `All ${docsToVerify.length} document(s) verified successfully.`);
-            } catch (error: any) {
-              console.error('Failed to verify all documents:', error);
-              Alert.alert('Error', error?.message || 'Failed to verify some documents.');
+            } catch (err: any) {
+              console.error('Failed to verify all documents:', err);
+              Alert.alert('Error', err?.message || 'Failed to verify some documents.');
             } finally {
               setUpdating(false);
             }
@@ -271,35 +280,33 @@ export default function AccountDocumentsScreen() {
         style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <ArrowLeft size={24} color="#1F2937" />
           </TouchableOpacity>
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>{params.accountName || 'Account'} - Documents</Text>
+            <Text style={styles.headerTitle}>{carName || 'Car'} - Documents</Text>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Text style={styles.statLabel}>Total:</Text>
-                <Text style={styles.statValue}>{documents.total_documents}</Text>
+                <Text style={styles.statValue}>{carDocuments.length}</Text>
               </View>
               <View style={styles.statItem}>
                 <Text style={[styles.statLabel, { color: '#F59E0B' }]}>Pending:</Text>
-                <Text style={[styles.statValue, { color: '#F59E0B' }]}>{documents.pending_count}</Text>
+                <Text style={[styles.statValue, { color: '#F59E0B' }]}>{pendingCount}</Text>
               </View>
               <View style={styles.statItem}>
                 <Text style={[styles.statLabel, { color: '#10B981' }]}>Verified:</Text>
-                <Text style={[styles.statValue, { color: '#10B981' }]}>{documents.verified_count}</Text>
+                <Text style={[styles.statValue, { color: '#10B981' }]}>{verifiedCount}</Text>
               </View>
               <View style={styles.statItem}>
                 <Text style={[styles.statLabel, { color: '#EF4444' }]}>Invalid:</Text>
-                <Text style={[styles.statValue, { color: '#EF4444' }]}>{documents.invalid_count}</Text>
+                <Text style={[styles.statValue, { color: '#EF4444' }]}>{invalidCount}</Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Document Info */}
         <View style={styles.documentInfoCard}>
           <View style={styles.documentInfoHeader}>
             <View style={styles.documentInfoTitleRow}>
@@ -312,16 +319,6 @@ export default function AccountDocumentsScreen() {
               </Text>
             </View>
           </View>
-
-          {currentDocument.car_name && (
-            <View style={styles.carInfo}>
-              <Text style={styles.carInfoLabel}>Car:</Text>
-              <Text style={styles.carInfoText}>
-                {currentDocument.car_name} ({currentDocument.car_number})
-              </Text>
-            </View>
-          )}
-
           <View style={styles.documentMeta}>
             <Text style={styles.metaLabel}>Type: {currentDocument.document_type}</Text>
             <Text style={styles.metaLabel}>
@@ -330,7 +327,6 @@ export default function AccountDocumentsScreen() {
           </View>
         </View>
 
-        {/* Document Image - pinch to zoom (iOS native ScrollView; Android shows image) */}
         <View style={styles.imageContainer}>
           {currentDocument.image_url ? (
             Platform.OS === 'ios' ? (
@@ -365,7 +361,6 @@ export default function AccountDocumentsScreen() {
           )}
         </View>
 
-        {/* View in browser link */}
         {currentDocument.image_url && (
           <TouchableOpacity style={styles.viewInBrowserLink} onPress={openInBrowser} activeOpacity={0.7}>
             <ExternalLink size={20} color="#3B82F6" />
@@ -373,7 +368,6 @@ export default function AccountDocumentsScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Action Buttons */}
         <View style={styles.actionsContainer}>
           <TouchableOpacity
             style={[
@@ -415,7 +409,6 @@ export default function AccountDocumentsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Navigation */}
         <View style={styles.navigationContainer}>
           <TouchableOpacity
             style={[styles.navButton, currentDocIndex === 0 && styles.navButtonDisabled]}
@@ -429,29 +422,28 @@ export default function AccountDocumentsScreen() {
           </TouchableOpacity>
 
           <Text style={styles.navigationText}>
-            Document {currentDocIndex + 1} of {allDocuments.length}
+            Document {currentDocIndex + 1} of {carDocuments.length}
           </Text>
 
           <TouchableOpacity
             style={[
               styles.navButton,
-              currentDocIndex === allDocuments.length - 1 && styles.navButtonDisabled,
+              currentDocIndex === carDocuments.length - 1 && styles.navButtonDisabled,
             ]}
             onPress={handleNext}
-            disabled={currentDocIndex === allDocuments.length - 1}
+            disabled={currentDocIndex === carDocuments.length - 1}
           >
-            <Text style={[styles.navButtonText, currentDocIndex === allDocuments.length - 1 && styles.navButtonTextDisabled]}>
+            <Text style={[styles.navButtonText, currentDocIndex === carDocuments.length - 1 && styles.navButtonTextDisabled]}>
               Next
             </Text>
-            <ChevronRight size={24} color={currentDocIndex === allDocuments.length - 1 ? '#9CA3AF' : '#3B82F6'} />
+            <ChevronRight size={24} color={currentDocIndex === carDocuments.length - 1 ? '#9CA3AF' : '#3B82F6'} />
           </TouchableOpacity>
         </View>
 
-        {/* Document Thumbnails */}
         <View style={styles.thumbnailsContainer}>
           <Text style={styles.thumbnailsTitle}>All Documents</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbnailsScroll}>
-            {allDocuments.map((doc, index) => (
+            {carDocuments.map((doc, index) => (
               <TouchableOpacity
                 key={doc.document_id}
                 style={[
@@ -466,11 +458,6 @@ export default function AccountDocumentsScreen() {
                 <Text style={styles.thumbnailName} numberOfLines={2}>
                   {doc.document_name}
                 </Text>
-                {doc.car_name && (
-                  <Text style={styles.thumbnailCar} numberOfLines={1}>
-                    {doc.car_name}
-                  </Text>
-                )}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -566,25 +553,6 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  carInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-    padding: 12,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-  },
-  carInfoLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  carInfoText: {
-    fontSize: 14,
-    color: '#1F2937',
-    fontWeight: '500',
   },
   documentMeta: {
     gap: 8,
@@ -764,11 +732,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 4,
   },
-  thumbnailCar: {
-    fontSize: 10,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
@@ -780,4 +743,3 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 });
-
