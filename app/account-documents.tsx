@@ -5,11 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   Alert,
   RefreshControl,
   Dimensions,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -18,6 +16,7 @@ import { ArrowLeft, CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, File
 import { apiService } from '@/services/api';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ErrorMessage from '@/components/ErrorMessage';
+import ZoomableImage from '@/components/ZoomableImage';
 
 interface DocumentItem {
   document_id: string;
@@ -330,33 +329,14 @@ export default function AccountDocumentsScreen() {
           </View>
         </View>
 
-        {/* Document Image - pinch to zoom (iOS native ScrollView; Android shows image) */}
+        {/* Document Image - pinch to zoom in app (iOS & Android) */}
         <View style={styles.imageContainer}>
           {currentDocument.image_url ? (
-            Platform.OS === 'ios' ? (
-              <ScrollView
-                style={styles.zoomScrollView}
-                contentContainerStyle={styles.zoomScrollContent}
-                maximumZoomScale={4}
-                minimumZoomScale={0.5}
-                showsHorizontalScrollIndicator={false}
-                showsVerticalScrollIndicator={false}
-              >
-                <Image
-                  source={{ uri: currentDocument.image_url }}
-                  style={styles.documentImage}
-                  resizeMode="contain"
-                />
-              </ScrollView>
-            ) : (
-              <View style={styles.imageWrapper}>
-                <Image
-                  source={{ uri: currentDocument.image_url }}
-                  style={styles.documentImage}
-                  resizeMode="contain"
-                />
-              </View>
-            )
+            <ZoomableImage
+              uri={currentDocument.image_url}
+              width={SCREEN_WIDTH - 80}
+              height={400}
+            />
           ) : (
             <View style={styles.noImageContainer}>
               <FileText size={48} color="#9CA3AF" />
