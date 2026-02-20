@@ -156,7 +156,7 @@ const resetPassword = async () => {
                 selectedRole === role && styles.roleButtonTextActive,
                 ]}
             >
-                {role}
+                {role === 'VehicleOwner' ? 'Driver' : role === 'Driver' ? 'Duty Driver' : role}
             </Text>
             </TouchableOpacity>
         ))}

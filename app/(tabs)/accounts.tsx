@@ -291,7 +291,7 @@ export default function AccountsScreen() {
       case 'vehicle_owner':
         return 'Driver';
       case 'driver':
-        return 'Driver';
+        return 'Duty Driver';
       case 'quickdriver':
         return 'Quick Driver';
       case 'car':
@@ -602,7 +602,7 @@ export default function AccountsScreen() {
             { label: 'All Types', value: 'all' },
             { label: 'Vendors', value: 'vendor' },
             { label: 'Drivers', value: 'vehicle_owner' },
-            { label: 'Quick Drivers', value: 'quickdriver' },
+            { label: 'Duty Drivers', value: 'quickdriver' },
           ]}
           keyExtractor={(item) => item.value}
           renderItem={({ item }) => (
