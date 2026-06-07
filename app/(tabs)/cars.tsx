@@ -134,6 +134,7 @@ export default function CarsScreen() {
 
   const handleStatusFilterChange = (value: StatusFilter) => {
     if (value === statusFilter || filterLoading) return;
+    setFilterLoading(true);
     setStatusFilter(value);
   };
 
@@ -332,7 +333,7 @@ export default function CarsScreen() {
         <Search size={18} color="#6B7280" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by car name, number, or owner..."
+          placeholder="Search by name, number, last 4 digits, or owner..."
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholderTextColor="#9CA3AF"
@@ -349,75 +350,39 @@ export default function CarsScreen() {
         </View>
       )}
 
-      {/* Status Filters */}
-      <View style={styles.filterButtons}>
-        <FlatList
-          horizontal
-          data={[
-            { label: 'All Statuses', value: 'all' },
-            { label: 'Online', value: 'ONLINE' },
-            { label: 'Driving', value: 'DRIVING' },
-            { label: 'Blocked', value: 'BLOCKED' },
-            { label: 'Processing', value: 'PROCESSING' },
-          ]}
-          keyExtractor={(item) => item.value}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                statusFilter === item.value && styles.filterButtonActive,
-              ]}
-              onPress={() => setStatusFilter(item.value as StatusFilter)}
-            >
-              <Text
-                style={[
-                  styles.filterButtonText,
-                  statusFilter === item.value && styles.filterButtonTextActive,
-                ]}
-              >
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          )}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterButtonsContainer}
-        />
-      </View>
+      {/* Static Status Tabs */}
+      <View style={styles.statusTabsRow}>
+        {STATUS_TABS.map((tab) => {
+          const isActive = statusFilter === tab.value;
+          const isLoadingTab = filterLoading && isActive;
 
-      {/* Car Type Filters */}
-      <View style={styles.filterButtons}>
-        <FlatList
-          horizontal
-          data={[
-            { label: 'All Types', value: 'all' },
-            ...CAR_TYPES.map(type => ({
-              label: type.replace(/_/g, ' '),
-              value: type,
-            })),
-          ]}
-          keyExtractor={(item) => item.value}
-          renderItem={({ item }) => (
+          return (
             <TouchableOpacity
+              key={tab.value}
               style={[
-                styles.filterButton,
-                carTypeFilter === item.value && styles.filterButtonActive,
+                styles.statusTab,
+                isActive && { backgroundColor: tab.color, borderColor: tab.color },
               ]}
-              onPress={() => setCarTypeFilter(item.value)}
+              onPress={() => handleStatusFilterChange(tab.value)}
+              disabled={filterLoading}
+              activeOpacity={0.7}
             >
-              <Text
-                style={[
-                  styles.filterButtonText,
-                  carTypeFilter === item.value && styles.filterButtonTextActive,
-                ]}
-                numberOfLines={1}
-              >
-                {item.label}
-              </Text>
+              {isLoadingTab ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text
+                  style={[
+                    styles.statusTabText,
+                    isActive && styles.statusTabTextActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {tab.label}
+                </Text>
+              )}
             </TouchableOpacity>
-          )}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterButtonsContainer}
-        />
+          );
+        })}
       </View>
 
       <FlatList
@@ -591,30 +556,31 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     padding: 0,
   },
-  filterButtons: {
-    marginBottom: 8,
-  },
-  filterButtonsContainer: {
+  statusTabsRow: {
+    flexDirection: 'row',
     paddingHorizontal: 20,
-    gap: 8,
+    marginBottom: 12,
+    gap: 6,
   },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  statusTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
     backgroundColor: '#F3F4F6',
-    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minHeight: 40,
   },
-  filterButtonActive: {
-    backgroundColor: '#3B82F6',
-  },
-  filterButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
+  statusTabText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: '#6B7280',
+    textAlign: 'center',
   },
-  filterButtonTextActive: {
-    color: 'white',
+  statusTabTextActive: {
+    color: '#FFFFFF',
   },
   listContainer: {
     paddingHorizontal: 20,
