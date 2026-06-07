@@ -268,6 +268,7 @@ export default function AccountDocumentsScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView
         style={styles.scrollView}
+        nestedScrollEnabled
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* Header */}
@@ -397,34 +398,35 @@ export default function AccountDocumentsScreen() {
 
         {/* Navigation */}
         <View style={styles.navigationContainer}>
-          <TouchableOpacity
-            style={[styles.navButton, currentDocIndex === 0 && styles.navButtonDisabled]}
-            onPress={handlePrevious}
-            disabled={currentDocIndex === 0}
-          >
-            <ChevronLeft size={24} color={currentDocIndex === 0 ? '#9CA3AF' : '#3B82F6'} />
-            <Text style={[styles.navButtonText, currentDocIndex === 0 && styles.navButtonTextDisabled]}>
-              Previous
-            </Text>
-          </TouchableOpacity>
-
           <Text style={styles.navigationText}>
             Document {currentDocIndex + 1} of {allDocuments.length}
           </Text>
+          <View style={styles.navigationButtonsRow}>
+            <TouchableOpacity
+              style={[styles.navButton, currentDocIndex === 0 && styles.navButtonDisabled]}
+              onPress={handlePrevious}
+              disabled={currentDocIndex === 0}
+            >
+              <ChevronLeft size={24} color={currentDocIndex === 0 ? '#9CA3AF' : '#3B82F6'} />
+              <Text style={[styles.navButtonText, currentDocIndex === 0 && styles.navButtonTextDisabled]}>
+                Previous
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.navButton,
-              currentDocIndex === allDocuments.length - 1 && styles.navButtonDisabled,
-            ]}
-            onPress={handleNext}
-            disabled={currentDocIndex === allDocuments.length - 1}
-          >
-            <Text style={[styles.navButtonText, currentDocIndex === allDocuments.length - 1 && styles.navButtonTextDisabled]}>
-              Next
-            </Text>
-            <ChevronRight size={24} color={currentDocIndex === allDocuments.length - 1 ? '#9CA3AF' : '#3B82F6'} />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.navButton,
+                currentDocIndex === allDocuments.length - 1 && styles.navButtonDisabled,
+              ]}
+              onPress={handleNext}
+              disabled={currentDocIndex === allDocuments.length - 1}
+            >
+              <Text style={[styles.navButtonText, currentDocIndex === allDocuments.length - 1 && styles.navButtonTextDisabled]}>
+                Next
+              </Text>
+              <ChevronRight size={24} color={currentDocIndex === allDocuments.length - 1 ? '#9CA3AF' : '#3B82F6'} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Document Thumbnails */}
@@ -669,15 +671,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   navigationContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: 'white',
     marginHorizontal: 20,
     marginBottom: 20,
     borderRadius: 12,
+  },
+  navigationButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 32,
+    marginTop: 12,
   },
   navButton: {
     flexDirection: 'row',

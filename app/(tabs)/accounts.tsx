@@ -294,11 +294,12 @@ export default function AccountsScreen() {
   };
 
   const filteredAccounts = accounts.filter(account => {
-    const searchLower = searchQuery.toLowerCase();
+    const searchLower = searchQuery.trim().toLowerCase();
+    if (!searchLower) return true;
+
     const mobileNumber = accountMobileNumbers[account.id] || account.primary_number || '';
     return (
       account.name.toLowerCase().includes(searchLower) ||
-      account.id.toLowerCase().includes(searchLower) ||
       mobileNumber.toLowerCase().includes(searchLower)
     );
   });
@@ -607,8 +608,8 @@ export default function AccountsScreen() {
     return <ErrorMessage message={error} onRetry={fetchAccounts} />;
   }
 
-  const renderListHeader = () => (
-    <View style={styles.listHeader}>
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Accounts</Text>
         <Text style={styles.subtitle}>{accounts.length} total accounts</Text>
@@ -618,10 +619,12 @@ export default function AccountsScreen() {
         <Search size={18} color="#6B7280" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by name, mobile number, or ID..."
+          placeholder="Search by name or mobile number..."
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholderTextColor="#9CA3AF"
+          keyboardType="default"
+          returnKeyType="search"
         />
       </View>
 
@@ -682,22 +685,19 @@ export default function AccountsScreen() {
           );
         })}
       </View>
-    </View>
-  );
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
       <FlatList
+        style={styles.list}
         data={filteredAccounts}
         renderItem={renderAccountItem}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={renderListHeader}
         contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No accounts found</Text>
@@ -718,8 +718,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     position: 'relative',
   },
-  listHeader: {
-    paddingBottom: 4,
+  list: {
+    flex: 1,
   },
   header: {
     paddingHorizontal: 20,
@@ -744,7 +744,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     marginHorizontal: 20,
     marginTop: 12,
-    marginBottom: 12,
+    marginBottom: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 10,

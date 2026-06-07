@@ -11,7 +11,7 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Package, MapPin, User, Car, Building2, Calendar, DollarSign, ChevronRight } from 'lucide-react-native';
+import { Search, Package, MapPin, User, Car, Building2, Calendar, IndianRupee, ChevronRight } from 'lucide-react-native';
 import { apiService } from '@/services/api';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ErrorMessage from '@/components/ErrorMessage';
@@ -229,7 +229,7 @@ export default function OrdersScreen() {
   };
 
   const formatCurrency = (amount: number) => {
-    return amount.toLocaleString('en-IN');
+    return `${amount.toLocaleString('en-IN')}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -378,7 +378,7 @@ export default function OrdersScreen() {
           </View>
 
           <View style={styles.priceRow}>
-            <DollarSign size={16} color="#10B981" />
+            <IndianRupee size={16} color="#10B981" />
             <Text style={styles.priceText}>
               {item.closed_vendor_price 
                 ? formatCurrency(item.closed_vendor_price)

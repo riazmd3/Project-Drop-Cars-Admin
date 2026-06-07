@@ -44,7 +44,6 @@ export default function ZoomableImage({
     .onUpdate((e) => {
       const newScale = savedScale.value * e.scale;
       scale.value = Math.min(MAX_SCALE, Math.max(MIN_SCALE, newScale));
-      // Clamp translation to new scale bounds
       const maxTx = (width * (scale.value - 1)) / 2;
       const maxTy = (height * (scale.value - 1)) / 2;
       translateX.value = clamp(translateX.value, -maxTx, maxTx);
@@ -52,15 +51,32 @@ export default function ZoomableImage({
     })
     .onEnd(() => {
       savedScale.value = scale.value;
-      const maxTx = (width * (scale.value - 1)) / 2;
-      const maxTy = (height * (scale.value - 1)) / 2;
-      translateX.value = clamp(translateX.value, -maxTx, maxTx);
-      translateY.value = clamp(translateY.value, -maxTy, maxTy);
-      savedTranslateX.value = translateX.value;
-      savedTranslateY.value = translateY.value;
+      if (scale.value <= 1) {
+        scale.value = 1;
+        savedScale.value = 1;
+        translateX.value = 0;
+        translateY.value = 0;
+        savedTranslateX.value = 0;
+        savedTranslateY.value = 0;
+      } else {
+        const maxTx = (width * (scale.value - 1)) / 2;
+        const maxTy = (height * (scale.value - 1)) / 2;
+        translateX.value = clamp(translateX.value, -maxTx, maxTx);
+        translateY.value = clamp(translateY.value, -maxTy, maxTy);
+        savedTranslateX.value = translateX.value;
+        savedTranslateY.value = translateY.value;
+      }
     });
 
   const panGesture = Gesture.Pan()
+    .manualActivation(true)
+    .onTouchesMove((_, state) => {
+      if (scale.value > 1) {
+        state.activate();
+      } else {
+        state.fail();
+      }
+    })
     .onUpdate((e) => {
       const maxTx = (width * (scale.value - 1)) / 2;
       const maxTy = (height * (scale.value - 1)) / 2;

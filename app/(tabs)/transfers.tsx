@@ -27,17 +27,54 @@ interface TransferTransaction {
   updated_at: string;
 }
 
+interface VendorInfo {
+  name: string;
+  mobile: string;
+}
+
 export default function TransfersScreen() {
   const [transfers, setTransfers] = useState<TransferTransaction[]>([]);
+  const [vendorInfoMap, setVendorInfoMap] = useState<Record<string, VendorInfo>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchVendorDetails = async (transactions: TransferTransaction[]) => {
+    const vendorIds = [...new Set(transactions.map((t) => t.vendor_id).filter(Boolean))];
+    const missingIds = vendorIds.filter((id) => !vendorInfoMap[id]);
+
+    if (missingIds.length === 0) return;
+
+    const results = await Promise.all(
+      missingIds.map(async (vendorId) => {
+        try {
+          const vendor = await apiService.getVendorDetails(vendorId);
+          return {
+            vendorId,
+            name: vendor.full_name || vendor.name || 'Unknown Vendor',
+            mobile: vendor.primary_number || '',
+          };
+        } catch {
+          return { vendorId, name: 'Unknown Vendor', mobile: '' };
+        }
+      })
+    );
+
+    setVendorInfoMap((prev) => {
+      const next = { ...prev };
+      results.forEach(({ vendorId, name, mobile }) => {
+        next[vendorId] = { name, mobile };
+      });
+      return next;
+    });
+  };
 
   const fetchTransfers = async () => {
     try {
       setError(null);
       const data = await apiService.getPendingTransfers(0, 100);
       setTransfers(data.transactions);
+      fetchVendorDetails(data.transactions);
     } catch (error) {
       setError('Failed to load transfer requests. Please try again.');
     } finally {
@@ -97,11 +134,19 @@ export default function TransfersScreen() {
     });
   };
 
-  const renderTransferItem = ({ item }: { item: TransferTransaction }) => (
+  const renderTransferItem = ({ item }: { item: TransferTransaction }) => {
+    const vendorInfo = vendorInfoMap[item.vendor_id];
+
+    return (
     <View style={styles.transferCard}>
       <View style={styles.transferHeader}>
         <View style={styles.transferInfo}>
-          <Text style={styles.vendorId}>Vendor: {item.vendor_id.substring(0, 8)}...</Text>
+          <Text style={styles.vendorName}>
+            {vendorInfo?.name || 'Loading vendor...'}
+          </Text>
+          <Text style={styles.vendorMobile}>
+            {vendorInfo?.mobile || 'Mobile unavailable'}
+          </Text>
           <StatusBadge status={item.status} type="transfer" />
         </View>
         <Text style={styles.requestedAmount}>{formatCurrency(item.requested_amount)}</Text>
@@ -147,7 +192,8 @@ export default function TransfersScreen() {
         </View>
       )}
     </View>
-  );
+    );
+  };
 
   if (loading) {
     return <LoadingSpinner />;
@@ -286,10 +332,15 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 8,
   },
-  vendorId: {
+  vendorName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  vendorMobile: {
     fontSize: 14,
     color: '#6B7280',
-    fontFamily: 'monospace',
+    fontWeight: '500',
   },
   requestedAmount: {
     fontSize: 20,

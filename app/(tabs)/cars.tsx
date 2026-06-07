@@ -53,9 +53,7 @@ const matchesCarSearch = (car: CarItem, query: string): boolean => {
   const textMatches =
     car.car_name.toLowerCase().includes(normalizedQuery) ||
     car.car_number.toLowerCase().includes(normalizedQuery) ||
-    car.vehicle_owner_name.toLowerCase().includes(normalizedQuery) ||
-    car.id.toLowerCase().includes(normalizedQuery) ||
-    car.vehicle_owner_id.toLowerCase().includes(normalizedQuery);
+    car.vehicle_owner_name.toLowerCase().includes(normalizedQuery);
 
   if (textMatches) return true;
 
@@ -333,7 +331,7 @@ export default function CarsScreen() {
         <Search size={18} color="#6B7280" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by name, number, last 4 digits, or owner..."
+          placeholder="Search by car name, number, owner name, or last 4 digits..."
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholderTextColor="#9CA3AF"

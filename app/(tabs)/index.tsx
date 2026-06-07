@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { User, DollarSign, TrendingUp, Eye, LogOut } from 'lucide-react-native';
+import { User, IndianRupee, TrendingUp, LogOut } from 'lucide-react-native';
 import {apiService} from '../../services/api';
 
 interface ProfileData {
@@ -41,7 +41,6 @@ export default function ProfileScreen() {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showAllLedger, setShowAllLedger] = useState(false);
   const router = useRouter();
 
   const fetchProfile = async () => {
@@ -101,7 +100,7 @@ export default function ProfileScreen() {
     return `₹${amount.toLocaleString()}`;
   };
 
-  const displayedLedger = showAllLedger ? ledger : ledger.slice(0, 5);
+  const displayedLedger = ledger;
 
   if (loading) {
     return (
@@ -151,7 +150,7 @@ export default function ProfileScreen() {
             
             <View style={styles.balanceContainer}>
               <View style={styles.balanceIcon}>
-                <DollarSign size={20} color="#10B981" />
+                <IndianRupee size={20} color="#10B981" />
               </View>
               <View>
                 <Text style={styles.balanceLabel}>Current Balance</Text>
@@ -170,17 +169,6 @@ export default function ProfileScreen() {
               <TrendingUp size={20} color="#6366F1" />
               <Text style={styles.ledgerTitle}>Account Ledger</Text>
             </View>
-            {ledger.length > 5 && (
-              <TouchableOpacity
-                style={styles.viewMoreButton}
-                onPress={() => setShowAllLedger(!showAllLedger)}
-              >
-                <Eye size={16} color="#6366F1" />
-                <Text style={styles.viewMoreText}>
-                  {showAllLedger ? 'Show Less' : 'View More'}
-                </Text>
-              </TouchableOpacity>
-            )}
           </View>
 
           {displayedLedger.length > 0 ? (
