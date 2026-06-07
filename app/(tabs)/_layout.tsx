@@ -61,7 +61,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="orders"
         options={{
-          title: 'Orders',
+          title: 'Bookings',
           tabBarIcon: ({ size, color }) => (
             <Package size={size} color={color} />
           ),

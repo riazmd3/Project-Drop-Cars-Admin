@@ -208,7 +208,7 @@ export default function ProfileScreen() {
                           {entry.entry_type}
                         </Text>
                       </View>
-                      <Text style={styles.orderText}>Order #{entry.order_id}</Text>
+                      <Text style={styles.orderText}>Booking #{entry.order_id}</Text>
                     </View>
                     <Text
                       style={[

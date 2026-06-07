@@ -28,6 +28,23 @@ interface Account {
   primary_number?: string; // Mobile number
 }
 
+type AccountTypeFilter = 'all' | 'vendor' | 'vehicle_owner' | 'driver' | 'quickdriver';
+type StatusFilter = 'all' | 'active' | 'inactive' | 'pending';
+
+const ACCOUNT_TYPE_TABS: { label: string; value: AccountTypeFilter; color: string }[] = [
+  { label: 'All', value: 'all', color: '#6B7280' },
+  { label: 'Vendors', value: 'vendor', color: '#3B82F6' },
+  { label: 'Drivers', value: 'vehicle_owner', color: '#10B981' },
+  { label: 'Duty', value: 'quickdriver', color: '#8B5CF6' },
+];
+
+const STATUS_TABS: { label: string; value: StatusFilter; color: string }[] = [
+  { label: 'All', value: 'all', color: '#6B7280' },
+  { label: 'Active', value: 'active', color: '#10B981' },
+  { label: 'Inactive', value: 'inactive', color: '#EF4444' },
+  { label: 'Pending', value: 'pending', color: '#F59E0B' },
+];
+
 const formatCurrency = (value?: number | null) => {
   if (value === null || value === undefined || isNaN(Number(value))) {
     return 'N/A';
@@ -43,15 +60,18 @@ export default function AccountsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
-  const [accountTypeFilter, setAccountTypeFilter] = useState<'all' | 'vendor' | 'vehicle_owner' | 'driver' | 'quickdriver'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
+  const [accountTypeFilter, setAccountTypeFilter] = useState<AccountTypeFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [typeFilterLoading, setTypeFilterLoading] = useState(false);
+  const [statusFilterLoading, setStatusFilterLoading] = useState(false);
+  const isFilterLoading = typeFilterLoading || statusFilterLoading;
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [accountDetails, setAccountDetails] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [accountMobileNumbers, setAccountMobileNumbers] = useState<Record<string, string>>({});
 
-  const fetchAccounts = async () => {
+  const fetchAccounts = async (isFilterChange = false) => {
     try {
       setError(null);
       const accountTypeParam = accountTypeFilter !== 'all' ? accountTypeFilter : undefined;
@@ -113,6 +133,8 @@ export default function AccountsScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setTypeFilterLoading(false);
+      setStatusFilterLoading(false);
     }
   };
 
@@ -201,8 +223,21 @@ export default function AccountsScreen() {
   };
 
   useEffect(() => {
-    fetchAccounts();
+    const isInitialLoad = loading && accounts.length === 0;
+    fetchAccounts(!isInitialLoad);
   }, [accountTypeFilter, statusFilter]);
+
+  const handleAccountTypeFilterChange = (value: AccountTypeFilter) => {
+    if (value === accountTypeFilter || isFilterLoading) return;
+    setTypeFilterLoading(true);
+    setAccountTypeFilter(value);
+  };
+
+  const handleStatusFilterChange = (value: StatusFilter) => {
+    if (value === statusFilter || isFilterLoading) return;
+    setStatusFilterLoading(true);
+    setStatusFilter(value);
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -568,16 +603,12 @@ export default function AccountsScreen() {
     );
   };
 
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
-  if (error) {
+  if (error && !loading && !isFilterLoading) {
     return <ErrorMessage message={error} onRetry={fetchAccounts} />;
   }
 
-  return (
-    <SafeAreaView style={styles.container}>
+  const renderListHeader = () => (
+    <View style={styles.listHeader}>
       <View style={styles.header}>
         <Text style={styles.title}>Accounts</Text>
         <Text style={styles.subtitle}>{accounts.length} total accounts</Text>
@@ -594,89 +625,87 @@ export default function AccountsScreen() {
         />
       </View>
 
-      {/* Account Type Filters */}
-      <View style={styles.filterButtons}>
-        <FlatList
-          horizontal
-          data={[
-            { label: 'All Types', value: 'all' },
-            { label: 'Vendors', value: 'vendor' },
-            { label: 'Drivers', value: 'vehicle_owner' },
-            { label: 'Duty Drivers', value: 'quickdriver' },
-          ]}
-          keyExtractor={(item) => item.value}
-          renderItem={({ item }) => (
+      <View style={styles.filterTabsRow}>
+        {ACCOUNT_TYPE_TABS.map((tab) => {
+          const isActive = accountTypeFilter === tab.value;
+
+          return (
             <TouchableOpacity
+              key={tab.value}
               style={[
-                styles.filterButton,
-                accountTypeFilter === item.value && styles.filterButtonActive,
+                styles.filterTab,
+                isActive && { backgroundColor: tab.color, borderColor: tab.color },
               ]}
-              onPress={() => setAccountTypeFilter(item.value as any)}
+              onPress={() => handleAccountTypeFilterChange(tab.value)}
+              disabled={isFilterLoading}
+              activeOpacity={0.7}
             >
               <Text
                 style={[
-                  styles.filterButtonText,
-                  accountTypeFilter === item.value && styles.filterButtonTextActive,
+                  styles.filterTabText,
+                  isActive && styles.filterTabTextActive,
                 ]}
+                numberOfLines={1}
               >
-                {item.label}
+                {tab.label}
               </Text>
             </TouchableOpacity>
-          )}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterButtonsContainer}
-        />
+          );
+        })}
       </View>
 
-      {/* Status Filters */}
-      <View style={styles.filterButtons}>
-        <FlatList
-          horizontal
-          data={[
-            { label: 'All Statuses', value: 'all' },
-            { label: 'Active', value: 'active' },
-            { label: 'Inactive', value: 'inactive' },
-            { label: 'Pending', value: 'pending' },
-          ]}
-          keyExtractor={(item) => item.value}
-          renderItem={({ item }) => (
+      <View style={styles.filterTabsRow}>
+        {STATUS_TABS.map((tab) => {
+          const isActive = statusFilter === tab.value;
+
+          return (
             <TouchableOpacity
+              key={tab.value}
               style={[
-                styles.filterButton,
-                statusFilter === item.value && styles.filterButtonActive,
+                styles.filterTab,
+                isActive && { backgroundColor: tab.color, borderColor: tab.color },
               ]}
-              onPress={() => setStatusFilter(item.value as any)}
+              onPress={() => handleStatusFilterChange(tab.value)}
+              disabled={isFilterLoading}
+              activeOpacity={0.7}
             >
               <Text
                 style={[
-                  styles.filterButtonText,
-                  statusFilter === item.value && styles.filterButtonTextActive,
+                  styles.filterTabText,
+                  isActive && styles.filterTabTextActive,
                 ]}
+                numberOfLines={1}
               >
-                {item.label}
+                {tab.label}
               </Text>
             </TouchableOpacity>
-          )}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterButtonsContainer}
-        />
+          );
+        })}
       </View>
+    </View>
+  );
 
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
       <FlatList
         data={filteredAccounts}
         renderItem={renderAccountItem}
         keyExtractor={(item) => item.id}
+        ListHeaderComponent={renderListHeader}
         contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No accounts found</Text>
           </View>
         }
       />
+
+      {(loading || isFilterLoading) && <LoadingSpinner overlay />}
 
       {renderAccountDetailsModal()}
     </SafeAreaView>
@@ -687,6 +716,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+    position: 'relative',
+  },
+  listHeader: {
+    paddingBottom: 4,
   },
   header: {
     paddingHorizontal: 20,
@@ -731,39 +764,41 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     padding: 0,
   },
-  filterButtons: {
-    marginBottom: 8,
-  },
-  filterButtonsContainer: {
+  filterTabsRow: {
+    flexDirection: 'row',
     paddingHorizontal: 20,
-    gap: 8,
+    marginBottom: 8,
+    gap: 6,
   },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  filterTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
     backgroundColor: '#F3F4F6',
-    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minHeight: 40,
   },
-  filterButtonActive: {
-    backgroundColor: '#3B82F6',
-  },
-  filterButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
+  filterTabText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: '#6B7280',
+    textAlign: 'center',
   },
-  filterButtonTextActive: {
-    color: 'white',
+  filterTabTextActive: {
+    color: '#FFFFFF',
   },
   listContainer: {
-    paddingHorizontal: 20,
     paddingBottom: 20,
+    flexGrow: 1,
   },
   accountCard: {
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
+    marginHorizontal: 20,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: {
@@ -980,6 +1015,7 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     paddingVertical: 40,
+    paddingHorizontal: 20,
     alignItems: 'center',
   },
   emptyText: {

@@ -158,7 +158,7 @@ export default function OrdersScreen() {
       setTotalCount(data.total_count);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
-      setError('Failed to load orders. Please try again.');
+      setError('Failed to load bookings. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -257,7 +257,7 @@ export default function OrdersScreen() {
       >
         <View style={styles.orderHeader}>
           <View style={styles.orderInfo}>
-            <Text style={styles.orderId}>Order ID: {item.id ? String(item.id).substring(0, 8) + '...' : 'N/A'}</Text>
+            <Text style={styles.orderId}>Booking ID: {item.id ? String(item.id).substring(0, 8) + '...' : 'N/A'}</Text>
             <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.trip_status) + '20' }]}>
               <Text style={[styles.statusText, { color: getStatusColor(item.trip_status) }]}>
                 {item.trip_status || 'N/A'}
@@ -413,7 +413,7 @@ export default function OrdersScreen() {
       >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Order Details</Text>
+            <Text style={styles.modalTitle}>Booking Details</Text>
             <TouchableOpacity
               onPress={() => setShowDetailsModal(false)}
               style={styles.closeButton}
@@ -423,16 +423,16 @@ export default function OrdersScreen() {
           </View>
 
           <ScrollView style={styles.modalContent}>
-            {/* Order Basic Info */}
+            {/* Booking Basic Info */}
             <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>Order Information</Text>
+              <Text style={styles.sectionTitle}>Booking Information</Text>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Order ID:</Text>
+                <Text style={styles.detailLabel}>Booking ID:</Text>
                 <Text style={styles.detailValue}>{selectedOrder.id ? String(selectedOrder.id) : 'N/A'}</Text>
               </View>
               {selectedOrder.source_order_id && (
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Source Order ID:</Text>
+                  <Text style={styles.detailLabel}>Source Booking ID:</Text>
                   <Text style={styles.detailValue}>{selectedOrder.source_order_id}</Text>
                 </View>
               )}
@@ -1019,15 +1019,15 @@ export default function OrdersScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Orders</Text>
-        <Text style={styles.subtitle}>{totalCount} total orders</Text>
+        <Text style={styles.title}>Bookings</Text>
+        <Text style={styles.subtitle}>{totalCount} total bookings</Text>
       </View>
 
       <View style={styles.searchContainer}>
         <Search size={18} color="#6B7280" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by order ID, customer, phone, or location..."
+          placeholder="Search by booking ID, customer, phone, or location..."
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholderTextColor="#9CA3AF"
@@ -1046,7 +1046,7 @@ export default function OrdersScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Package size={48} color="#9CA3AF" />
-            <Text style={styles.emptyText}>No orders found</Text>
+            <Text style={styles.emptyText}>No bookings found</Text>
           </View>
         }
       />
